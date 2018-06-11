@@ -1,0 +1,70 @@
+#include <stdio.h>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+
+using namespace cv;
+using namespace std;
+
+float yuvData[1920 * 1080 * 3];
+float *pYuvBuf = yuvData;
+
+int main(int argc, char *argv[])
+{
+	printf("filename: %s\n", argv[1]);
+	printf("dump to %s\n", argv[2]);
+
+	Mat src = imread(argv[1]);
+	if (src.empty())
+	{
+		printf("can not open %s\n", argv[1]);
+		return -1;
+	}
+	Mat dst;
+	resize(src, dst, Size(48,48));
+	imwrite("48.jpg", dst);
+	
+	FILE* pFileOut0 = fopen("rawdata.yuv", "wb");
+	if (!pFileOut0)
+	{
+		printf("pFileOut open error \n");
+		system("pause");
+		exit(-1);
+	}
+	fwrite(src.data, src.cols*src.rows * 3, 1, pFileOut0);
+	fclose(pFileOut0);
+
+	src.convertTo(src, CV_32F, 1.0 / 128, -127.5/128);
+	//cvtColor(src, src, CV_BGR2RGB);
+
+	printf("w: %d h : %d\n", src.cols, src.rows);
+
+	FILE* pFileOut = fopen(argv[2], "wb");
+	if (!pFileOut)
+	{
+		printf("pFileOut open error \n");
+		system("pause");
+		exit(-1);
+	}
+
+	std::vector<cv::Mat> rgbChannels(3);
+	split(src, rgbChannels);
+
+	printf("%d %d %d\n", rgbChannels[0].step[0], rgbChannels[0].cols, rgbChannels[0].rows);
+
+	printf("%f %x\n", *((float*)rgbChannels[0].data + 0), *((unsigned int*)rgbChannels[0].data + 0));
+	printf("%f %x\n",*((float*)rgbChannels[0].data+1), *((unsigned int*)rgbChannels[0].data+1));
+	printf("%f %x\n", *((float*)rgbChannels[0].data + 2), *((unsigned int*)rgbChannels[0].data + 2));
+
+	memcpy(pYuvBuf, rgbChannels[0].data, src.cols*src.rows * 4);
+	memcpy(pYuvBuf + src.cols*src.rows, rgbChannels[1].data, src.cols*src.rows * 4);
+	memcpy(pYuvBuf + src.cols*src.rows * 2, rgbChannels[2].data, src.cols*src.rows * 4);
+
+	fwrite(pYuvBuf, src.cols*src.rows* 3*4, 1, pFileOut);
+	fclose(pFileOut);
+
+	printf("dump y channel ok\n");
+    return 0;
+}
+
+
